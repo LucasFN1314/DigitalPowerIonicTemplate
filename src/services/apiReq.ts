@@ -1,17 +1,41 @@
-import axios from "axios";
-import {show} from "./notification";
+import axios, { AxiosInstance } from "axios";
+import { show } from "./notification";
 
-const site_id = "fortaleza";
-export const backendUrl = "https://backend.digitalpower.ar";
-const service = axios.create({
+export const site_name: string = "papelera.db";
+export const backendUrl: string = "https://backend.digitalpower.ar";
+export const paymentUrl: string = "https://payment.digitalpower.ar";
+export const databaseUrl: string = "https://database.digitalpower.ar";
+export const authUrl: string = "https://auth.digitalpower.ar";
+
+interface User {
+    token: string | null;
+    id: string | null;
+    site_name: string | null;
+}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const Service: AxiosInstance = axios.create({
     baseURL: `${backendUrl}/api`,
 });
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const DBService: AxiosInstance = axios.create({
+    baseURL: `${databaseUrl}/api`,
+});
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const AuthService: AxiosInstance = axios.create({
+    baseURL: `${authUrl}/`,
+});
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const PaymentService: AxiosInstance = axios.create({
+    baseURL: `${paymentUrl}/`,
+});
 
-let user = {token: null, id: null, site_id: null};
-if (localStorage.getItem("fortaleza_user") !== "undefined") user = JSON.parse(<string>localStorage?.getItem("fortaleza_user"))
-if (localStorage.getItem("dp_user") !== "undefined")
-    user = JSON.parse(<string>localStorage.getItem("dp_user"));
-const config = {
+let user: User = { token: null, id: null, site_name: null };
+const storedUser = localStorage.getItem("user");
+if (storedUser && storedUser !== "undefined") {
+    user = JSON.parse(storedUser) as User;
+}
+
+const config: any = {
     headers: {
         Authorization: `Bearer ${user?.token}`,
         Accept: "application/json",
@@ -19,24 +43,26 @@ const config = {
     },
 };
 
-export const post = (path: any, body: any) => {
-    if (!body) {
-        body = {};
+export const post = (path: string, body: any = {}, service: AxiosInstance = DBService): Promise<any> => {
+    if (!user) {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) user = JSON.parse(storedUser) as User;
+        config.headers.Authorization = `Bearer ${user?.token}`;
     }
-    body.site_id = user?.site_id ?? site_id;
+
+    body.site_name = body?.site_name ?? site_name ?? user?.site_name;
+    body.schema = body?.schema ?? site_name ?? user?.site_name;
     if (user?.id) body.user_id = user?.id;
 
+    // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve) => {
         service
-            .post(path, {data: body}, config)
+            .post(path, body, config)
             .then((response: any) => {
-                let message = response?.message ?? response.data?.message;
-                let status = response?.status ?? response.data?.status;
+                const message = response?.data?.message;
+                const status = response?.status ?? response?.data?.status;
 
-                if (response.data?.data) response = response?.data;
-                if (message) {
-                    show(message);
-                }
+                if (message) show(message);
 
                 setTimeout(() => {
                     if (response?.data?.redirect) {
@@ -49,60 +75,13 @@ export const post = (path: any, body: any) => {
                 }
                 resolve(response);
             })
-            .catch((err) => {
-                console.log(err)
-                if (err.response.status === 401) {
-                    localStorage.removeItem("dp_user");
-                    location.href = "/login";
-                }
-                show("Ha ocurrido un error, intente mas tarde");
-            })
-            .finally(() => {
-            });
-    });
-};
-export const files = (path: any, body: any) => {
-    if (body?.append) {
-        body.append("site_id", user?.site_id);
-        if (user?.id) body.append("user_id", user?.id);
-
-    } else {
-        body.site_id = user?.site_id;
-        if (user?.id) body.user_id = user?.id;
-
-    }
-
-    return new Promise((resolve) => {
-        service
-            .post(path, body, {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                    Authorization: `Bearer ${user?.token}`,
-                    Accept: "application/json",
-                },
-            })
-            .then((response) => {
-                if (response.data?.message) {
-                    show(response.data.message);
-                }
-                setTimeout(() => {
-                    if (response?.data?.data?.redirect)
-                        location.href = response?.data?.data?.redirect;
-                }, 1000);
-
-                if (response.data?.status === 401) {
-                    location.href = "/admin";
-                }
-
-                resolve(response.data);
-            })
-            .catch((err) => {
+            .catch((err: any) => {
+                console.error(err);
                 if (err?.response?.status === 401) {
-                    location.href = "/login";
+                    // localStorage.removeItem("dp_user");
+                    // location.href = "/#/login";
                 }
-                show("Ha ocurrido un error, intente mas tarde");
-            })
-            .finally(() => {
+                show(err?.response?.data?.message || "Ha ocurrido un error, intente más tarde");
             });
     });
 };

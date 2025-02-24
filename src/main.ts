@@ -33,6 +33,10 @@ import '@ionic/vue/css/palettes/dark.system.css';
 
 /* Theme variables */
 import './theme/variables.css';
+import './styles.scss';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as bootstrap from "bootstrap"
+import 'boxicons'
 
 const app = createApp(App)
   .use(IonicVue)
